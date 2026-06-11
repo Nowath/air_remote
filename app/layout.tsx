@@ -7,6 +7,11 @@ import "@/app/styles/globals.css";
 export const metadata: Metadata = {
   title: "air-remote",
   description: "air-remote — Next.js + Supabase + shadcn/ui (Feature-Sliced Design)",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -22,7 +22,7 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/account");
+  redirect("/remote");
 }
 
 export async function signOut() {
