@@ -1,4 +1,5 @@
 'use client'
+import { useState } from "react"
 import {
   Power,
   ScrollText,
@@ -8,6 +9,7 @@ import {
   Loader,
   CheckCircle2,
   XCircle,
+  RotateCw,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -153,15 +155,44 @@ function LogList({
 function LogView({
   logs,
   onDelete,
+  onReload,
 }: {
   logs: LogEntry[]
   onDelete: (id: string) => void
+  onReload?: () => void | Promise<void>
 }) {
   const normalLogs = logs.filter((log) => !log.daily)
   const dailyLogs = logs.filter((log) => log.daily)
+  const [reloading, setReloading] = useState(false)
+
+  const handleReload = async () => {
+    if (!onReload || reloading) return
+    setReloading(true)
+    try {
+      await onReload()
+    } finally {
+      setReloading(false)
+    }
+  }
 
   return (
     <div className="p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-medium">ประวัติคำสั่ง</h2>
+        {onReload && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleReload}
+            disabled={reloading}
+            aria-label="โหลดข้อมูลใหม่"
+          >
+            <RotateCw className={`size-4 ${reloading ? 'animate-spin' : ''}`} />
+            โหลดใหม่
+          </Button>
+        )}
+      </div>
       <Tabs defaultValue="normal">
         <TabsList variant="line" className="w-full">
           <TabsTrigger value="normal">คำสั่งปกติ</TabsTrigger>

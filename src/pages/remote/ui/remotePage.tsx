@@ -100,7 +100,7 @@ function RemotePage() {
             />
           </div>
         ) : (
-          <LogView logs={logs} onDelete={removeLog} />
+          <LogView logs={logs} onDelete={removeLog} onReload={loadLogs} />
         )}
       </div>
       <BottomBar view={view} setView={setView} />
