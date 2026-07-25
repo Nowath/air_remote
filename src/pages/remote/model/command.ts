@@ -99,7 +99,7 @@ export async function fetchLogs(): Promise<LogEntry[]> {
     temp: row.target_temp ?? 0,
     mode: (row.mode ?? 'cool') as IMode,
     daily: true,
-    fromCron: row.from_cron ?? false,
+    fromCron: false,
     status: null,
     startTime: toHHmm(row.start_time),
     endTime: toHHmm(row.end_time),
@@ -122,7 +122,7 @@ export async function pushSchedule(input: AirScheduleInput) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('air_schedules')
-    .insert({ ...input, from_cron: false })
+    .insert(input)
     .select()
     .single()
 

@@ -48,6 +48,20 @@ Layers under `src/`, highest to lowest: `app → pages → widgets → features 
 
 Path aliases (see `tsconfig.json`): `@/app/*`, `@/pages/*`, `@/widgets/*`, `@/features/*`, `@/entities/*`, `@/shared/*`, and `@/*`.
 
+## The remote domain (the app's actual product logic)
+
+The `/remote` page is an air-conditioner remote that writes to two Supabase tables. All data access lives in **`src/pages/remote/model/command.ts`** (uses the browser `createClient`; called from Client Components). Shared types (`IMode = "fan" | "dry" | "cool"`, `LogEntry`) and the `mode` list (icon per mode, from `react-icons/fa6`) live in `src/pages/remote/config/index.ts`.
+
+Two tables, two intents:
+- **`air_commands`** — one-shot commands. Columns used: `action` (`"TURN_ON"`/`"TURN_OFF"`), `temp`, `mode`, `status` (written as `"pending"`; a downstream consumer flips it to success/failed), `from_cron`, `created_at`. Written by `pushCommand`.
+- **`air_schedules`** — recurring daily schedules. Columns: `start_time`/`end_time` (`HH:mm`), `target_temp`, `mode`, `is_enabled`, `from_cron` (inserted as `false`), `created_at`. Written by `pushSchedule`.
+
+`from_cron` marks rows an external cron/automation created vs. the user — this app only writes user rows (`from_cron: false`) and reads the flag back for the log view. There is no cron code in this repo; it lives elsewhere and shares these tables.
+
+Read paths: `fetchLatestCommand()` seeds the remote's power/temp/mode from the newest `air_commands` row; `fetchLogs()` merges both tables into a unified `LogEntry[]` sorted by `createdAt` desc (schedules get `daily: true`); `deleteLog(id)` routes by an `"s:"`/`"c:"` id prefix to the right table. Temp is clamped to **20–30°C** in the UI (`MIN_TEMP`/`MAX_TEMP` in `remotePage.tsx`).
+
+The page (`remotePage.tsx`) is a single `'use client'` component with local `useState` and two views toggled by a bottom bar: the remote pad and the log/history view (`logView.tsx`). Submitting with the "daily" switch on + power on calls `pushSchedule`; otherwise `pushCommand`.
+
 ## Supabase auth (the wiring that spans files)
 
 Lives in `src/shared/api/supabase/`. Three clients for three contexts — pick the right one:
@@ -58,7 +72,7 @@ Lives in `src/shared/api/supabase/`. Three clients for three contexts — pick t
 
 Conventions to preserve:
 - In server/middleware code use **`getClaims()`** (verifies the JWT), never `getSession()`. Do not insert code between `createServerClient` and `getClaims()`.
-- Auth flows are Server Actions in `src/features/auth/api/actions.ts` (`signIn`/`signOut`), wired to the form via `formAction`. On error `signIn` redirects back to `/` (the login page) with an `error` query param; `signOut` redirects to `/`. Note: `signIn` currently `redirect`s to `/account` on success, but no `/account` route exists — the live authenticated home is `/remote`. Treat this as a stale path to reconcile (point it at `/remote`).
+- Auth flows are Server Actions in `src/features/auth/api/actions.ts` (`signIn`/`signOut`), wired to the form via `formAction`. On success `signIn` `redirect`s to `/remote`; on error it redirects back to `/` (the login page) with an `error` query param; `signOut` redirects to `/`. Both call `revalidatePath("/", "layout")` first. (One stale reference remains: the comment in `middleware.ts` still says signed-in users are sent to `/account` — the code actually redirects to `/remote`.)
 - Route protection is centralized in `middleware.ts`: `PUBLIC_PATHS` (`/`, `/auth`) is reachable signed out; `AUTH_ONLY_PATHS` (`/`) bounces signed-in users to `/remote`. Unauthenticated visitors to any other route are redirected to `/` with a `redirectedFrom` query param.
 - Client-side auth state comes from `AuthProvider` (`@/features/auth`), seeded server-side in `src/app/providers` via `getClaims()` and kept live with `onAuthStateChange`. Read it in Client Components with `useAuth()`; Server Components should call `getClaims()` directly.
 - Env config is read literally in `config.ts` (prefers `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, falls back to the anon key). Copy `.env.example` → `.env.local`. `NEXT_PUBLIC_*` keys are inlined into the client bundle at build time.
