@@ -1,26 +1,16 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/shared/api/supabase/server";
+
 import RemotePage from "./remotePage";
 
 export const metadata: Metadata = {
-  title: "Account · air-remote",
+  title: "รีโมท · air-remote",
 };
 
-export async function RemoteContainer() {
-  const supabase = await createClient();
-
-  // Verify the JWT with getClaims() — never trust getSession() in server code.d
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-
-  if (!claims) {
-    redirect("/");
-  }
-
+/** `/remote` — reachable only with a valid PIN cookie (enforced in `proxy.ts`). */
+export function RemoteContainer() {
   return (
     <main className="flex items-center justify-center max-h-screen overflow-hidden">
-      <RemotePage/>
+      <RemotePage />
     </main>
   );
 }

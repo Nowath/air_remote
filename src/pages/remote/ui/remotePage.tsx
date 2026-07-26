@@ -17,25 +17,32 @@ import {
   Label,
   TimePicker
 } from "@/shared/ui"
-import { mode, IMode, type LogEntry } from '../config'
+import { FaFan } from "react-icons/fa6"
+import {
+  mode,
+  IMode,
+  MIN_TEMP,
+  MAX_TEMP,
+  DEFAULT_TEMP,
+  clampTemp,
+  usesTemperature,
+  type LogEntry,
+} from '../config'
 import {
   pushCommand,
   pushSchedule,
   fetchLogs,
   deleteLog,
   fetchLatestCommand,
-} from '../model/command'
+} from '../api/command'
 import LogView from './logView'
-
-const MIN_TEMP = 20
-const MAX_TEMP = 30
 
 type View = 'remote' | 'log'
 
 function RemotePage() {
   const [view, setView] = useState<View>('remote')
   const [power, setPower] = useState(false)
-  const [temp, setTemp] = useState(25)
+  const [temp, setTemp] = useState(DEFAULT_TEMP)
   const [sMode, setSMode] = useState<IMode>(mode[0].value)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,7 +61,9 @@ function RemotePage() {
       const latest = await fetchLatestCommand()
       if (!latest) return
       setPower(latest.power)
-      setTemp(latest.temp)
+      // Clamped again here: the value crosses a Server Action boundary, and a
+      // stale/odd row must never leave the pad stuck outside MIN/MAX_TEMP.
+      setTemp(clampTemp(latest.temp))
       setSMode(latest.mode)
     } catch (err) {
       console.error(err)
@@ -89,7 +98,7 @@ function RemotePage() {
       <div className="grow overflow-auto">
         {view === 'remote' ? (
           <div className="flex flex-col min-h-full">
-            <TopPart temp={temp} power={power} setPower={setPower} />
+            <TopPart temp={temp} power={power} setPower={setPower} sMode={sMode} />
             <BottomPart
               temp={temp}
               setTemp={setTemp}
@@ -147,11 +156,14 @@ function TopPart({
   temp,
   power,
   setPower,
+  sMode,
 }: {
   temp: number
   power: boolean
   setPower: (data: boolean) => void
+  sMode: IMode
 }) {
+  const showTemp = power && usesTemperature(sMode)
   return (
     <div className="h-56 w-full relative">
       <Button
@@ -166,11 +178,20 @@ function TopPart({
         <Power className="size-6" />
       </Button>
       <div
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-7xl remoteFont font-bold transition-opacity ${
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity ${
           power ? 'opacity-100' : 'opacity-30'
         }`}
       >
-        {power ? temp : '--'}
+        {showTemp ? (
+          <span className="text-7xl remoteFont font-bold">{temp}</span>
+        ) : power ? (
+          <>
+            <FaFan className="size-16 animate-[spin_3s_linear_infinite]" />
+            <span className="text-sm text-gray-600">โหมดพัดลม</span>
+          </>
+        ) : (
+          <span className="text-7xl remoteFont font-bold">--</span>
+        )}
       </div>
     </div>
   )
@@ -232,13 +253,17 @@ function BottomPart({
     await onSubmitted()
     toast.success("success")
   }
+  // Fan mode has no target temperature, so the stepper is locked for it.
+  const tempEnabled = power && usesTemperature(sMode)
+
   return (
     <div className="bg-gray-200 rounded-t-2xl flex flex-col gap-6 p-6 grow">
       <div className="w-full flex flex-col items-center gap-2">
         <Button
           type="button"
           onClick={up}
-          disabled={!power || temp >= MAX_TEMP}
+          disabled={!tempEnabled || temp >= MAX_TEMP}
+          aria-label="เพิ่มอุณหภูมิ"
           size="icon-lg"
           className="w-15 h-15"
         >
@@ -247,7 +272,8 @@ function BottomPart({
         <Button
           type="button"
           onClick={down}
-          disabled={!power || temp <= MIN_TEMP}
+          disabled={!tempEnabled || temp <= MIN_TEMP}
+          aria-label="ลดอุณหภูมิ"
           size="icon-lg"
           className="w-15 h-15"
         >

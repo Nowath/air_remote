@@ -1,5 +1,6 @@
 'use client'
 import { useState } from "react"
+import { format } from "date-fns"
 import {
   Power,
   ScrollText,
@@ -29,16 +30,26 @@ function modeName(value: LogEntry['mode']) {
 
 type StatusMeta = { label: string; className: string; icon: LucideIcon }
 
-/** Map a command's processing status ("pending"/"success"/"error") to a badge. */
+/**
+ * Map a command's processing status to a badge. The consumer that executes the
+ * command owns this column and has used several spellings ("error", "failed",
+ * "ok"), so each outcome accepts a few aliases — anything unrecognised falls
+ * back to "pending" rather than silently reading as a failure.
+ */
 function statusMeta(status: string): StatusMeta {
   switch (status.trim().toLowerCase()) {
     case 'success':
+    case 'succeeded':
+    case 'ok':
+    case 'done':
       return {
         label: 'สำเร็จ',
         className: 'bg-green-100 text-green-700',
         icon: CheckCircle2,
       }
     case 'error':
+    case 'failed':
+    case 'fail':
       return {
         label: 'ไม่สำเร็จ',
         className: 'bg-red-100 text-red-700',
@@ -81,7 +92,9 @@ function LogCard({
             <span className="font-medium">
               {log.power ? `${log.temp}°` : 'ปิดเครื่อง'}
             </span>
-            <span className="text-sm text-gray-500">{log.time}</span>
+            <span className="text-sm text-gray-500">
+              {format(new Date(log.createdAt), 'dd/MM/yyyy HH:mm')}
+            </span>
             <div className="flex gap-1">
             <span
               className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
